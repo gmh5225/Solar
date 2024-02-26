@@ -421,7 +421,8 @@ impl Interner {
         let hot = total - cold;
 
         let lock = self.0.lock();
-        let mut strings = lock.strings.iter().copied().collect::<Vec<_>>();
+        let unsorted_strings = lock.strings.iter().copied().collect::<Vec<_>>();
+        let mut strings = unsorted_strings.clone();
         strings.sort_by_key(|s| s.len());
         let lengths = strings.iter().map(|s| s.len()).collect::<Vec<_>>();
         let len = strings.len();
@@ -429,6 +430,8 @@ impl Interner {
         let median = median(&lengths);
         let top = strings.iter().rev().take(20).map(|s| s.len()).collect::<Vec<_>>();
         let top_len = top.len();
+        // let all = &unsorted_strings[PREINTERNED_SYMBOLS_COUNT as usize..];
+        // std::fs::write("/tmp/all_strings.expr", format!("{all:#?}")).unwrap();
 
         println!(
             "\
