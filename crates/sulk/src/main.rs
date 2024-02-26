@@ -91,6 +91,7 @@ impl Compiler {
     }
 
     fn finish_diagnostics(&self) -> Result {
+        SessionGlobals::with(|g| g.symbol_interner.print());
         self.sess.dcx.print_error_count()
     }
 }

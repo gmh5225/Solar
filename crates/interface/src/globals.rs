@@ -11,7 +11,7 @@ scoped_tls::scoped_thread_local!(static SESSION_GLOBALS: SessionGlobals);
 /// threads within the compilation session, but is not accessible outside the
 /// session.
 pub struct SessionGlobals {
-    pub(crate) symbol_interner: crate::symbol::Interner,
+    pub symbol_interner: crate::symbol::Interner,
     /// A reference to the source map in the `Session`. It's an `Option`
     /// because it can't be initialized until `Session` is created, which
     /// happens after `SessionGlobals`. `set_source_map` does the

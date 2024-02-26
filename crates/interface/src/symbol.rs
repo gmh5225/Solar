@@ -334,7 +334,7 @@ impl ToString for Symbol {
 /// Symbol interner.
 ///
 /// Initialized in `SessionGlobals` with the `symbols!` macro's initial symbols.
-pub(crate) struct Interner(Lock<InternerInner>);
+pub struct Interner(Lock<InternerInner>);
 
 // The `&'static str`s in this type actually point into the arena.
 //
@@ -352,6 +352,10 @@ impl InternerInner {
     }
 }
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+static INTERN_TOTAL_COUNTER: AtomicUsize = AtomicUsize::new(0);
+static INTER_COLD_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
 impl Interner {
     pub(crate) fn fresh() -> Self {
         Self(Lock::new(InternerInner::fresh()))
@@ -368,10 +372,12 @@ impl Interner {
 
     #[inline]
     fn intern(&self, string: &str) -> Symbol {
+        INTERN_TOTAL_COUNTER.fetch_add(1, Ordering::Relaxed);
         let mut inner = self.0.lock();
         if let Some(idx) = inner.strings.get_index_of(string) {
             return Symbol::new(idx as u32);
         }
+        INTER_COLD_COUNTER.fetch_add(1, Ordering::Relaxed);
 
         let string: &str = inner.arena.alloc_str(string);
 
@@ -386,6 +392,58 @@ impl Interner {
         debug_assert!(is_new); // due to the get_index_of check above
 
         Symbol::new(idx as u32)
+    }
+
+    pub fn print(&self) {
+        fn mean(v: &[usize]) -> usize {
+            let len = v.len();
+            if len == 0 {
+                return 0;
+            }
+            v.iter().sum::<usize>() / len
+        }
+
+        fn median(v: &[usize]) -> usize {
+            let len = v.len();
+            if len == 0 {
+                return 0;
+            }
+            let half = len / 2;
+            if len % 2 == 0 {
+                (v[half] + v[half - 1]) / 2
+            } else {
+                v[half]
+            }
+        }
+
+        let total = INTERN_TOTAL_COUNTER.load(Ordering::Relaxed);
+        let cold = INTER_COLD_COUNTER.load(Ordering::Relaxed);
+        let hot = total - cold;
+
+        let lock = self.0.lock();
+        let mut strings = lock.strings.iter().copied().collect::<Vec<_>>();
+        strings.sort_by_key(|s| s.len());
+        let lengths = strings.iter().map(|s| s.len()).collect::<Vec<_>>();
+        let len = strings.len();
+        let mean = mean(&lengths);
+        let median = median(&lengths);
+        let top = strings.iter().rev().take(20).map(|s| s.len()).collect::<Vec<_>>();
+        let top_len = top.len();
+
+        println!(
+            "\
+Interner stats:
+- `intern`
+  - total: {total}
+  - cold:  {cold}
+  - hot:   {hot}
+- strings
+  - total:  {len}
+  - mean:   {mean}
+  - median: {median}
+  - top {top_len}: {top:?}\
+            ",
+        );
     }
 
     /// Get the symbol as a string.
