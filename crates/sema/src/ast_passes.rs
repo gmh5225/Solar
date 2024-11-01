@@ -1,6 +1,6 @@
 //! AST-related passes.
 
-use solar_ast::{ast, visit::Visit};
+use solar_ast::{self as ast, visit::Visit};
 use solar_interface::{diagnostics::DiagCtxt, sym, Session, Span};
 
 #[instrument(name = "ast_passes", level = "debug", skip_all)]
